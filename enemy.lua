@@ -41,8 +41,8 @@ end
 
 function Enemy:RemoveHp(amount)
     print( "Enemy took " .. amount .. " damage" )
-    print( "Hp remaining " .. self.hp .. "/" .. self.maxHp)
     self.hp = self.hp - amount
+    print( "Hp remaining " .. self.hp .. "/" .. self.maxHp)
     if self.hp <= 0 then
         self.dead = true
     end

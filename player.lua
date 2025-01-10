@@ -8,11 +8,12 @@ function Player:Init(x, y)
     self.xp = 0
     self.maxHp = 10
     self.hp = Player.maxHp
-    self.healthRegen = 1
+    self.healthRegen = .25
     self.damage = 1
-    self.attackSpeed = 5
+    self.attackSpeed = 2
     self.dead = false
     self.gold = 0
+    self.killCount = 0
 
     self.abilities = {
         auto = true,

@@ -22,3 +22,11 @@ Post Run
 
 #### Game
 *   Current Run info menu
+
+### TODO
+* Add new game / load game
+* Add save game
+* Add buy menu
+* Fix Game crashing when player dies from enemy
+* Add waves that increase as time goes on
+* Differnt enemy types (json or yaml?)
