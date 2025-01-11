@@ -11,7 +11,7 @@ function Player:Init(x, y)
     self.maxHp = 5
     self.hp = Player.maxHp
     self.healthRegen = .25
-    self.damage = 2
+    self.damage = 1
     self.attackSpeed = 2
     self.attackRadius = 100
     self.dead = false
@@ -20,7 +20,10 @@ function Player:Init(x, y)
 
     self.abilities = {
         auto = true,
-        autoOn = true
+        autoOn = true,
+        spread = false,
+        chain = true,
+        chainAmount = 2,
     }
     return player
 end
@@ -45,4 +48,28 @@ function Player:addHp(amount)
     end
 
     print( "Hp " .. self.hp .. "/" .. self.maxHp)
+end
+
+function Player:Abilities(e)
+    print( "---------- Abilities ----------")
+    if self.abilities.chain then
+        local currentEnemy = e
+        for i = 1, self.abilities.chainAmount, 1 do
+            print( "Chain Ability Bounce " .. i )
+            local nearestEnemy = FindNearestEnemyviaEnemy(currentEnemy)
+            if nearestEnemy then
+                print( "Enemy " .. currentEnemy.id .. " Chaining to Enemy " .. nearestEnemy.id)
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.line(currentEnemy.x, currentEnemy.y, nearestEnemy.x, nearestEnemy.y)
+                nearestEnemy:RemoveHp(Player.damage)
+                table.insert(GameState.Chains, {
+                    startTime = love.timer.getTime(),
+                    startEnemy = currentEnemy,
+                    endEnemy = nearestEnemy,
+                })
+            end
+            currentEnemy = nearestEnemy
+        end
+    end
+    print( "----------  ----------")
 end

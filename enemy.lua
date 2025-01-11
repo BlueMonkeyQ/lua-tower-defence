@@ -10,38 +10,39 @@ Spawn Direction:
     4: down
 --]]
 function Enemy:SpawnEnemy()
-    local enemy = setmetatable({}, self)
+    local enemy = setmetatable({}, { __index = self })
     local spawnSide = math.random(1,4)
 
     if spawnSide == 1 then
-        self.x = -10
-        self.y = math.random(0, Layouts.GameWindowLayout.height)
+        enemy.x = -10
+        enemy.y = math.random(0, Layouts.GameWindowLayout.height)
     elseif spawnSide == 2 then
-        self.x = math.random(0, ScreenWidth)
-        self.y = Layouts.GameWindowLayout.y - 10
+        enemy.x = math.random(0, ScreenWidth)
+        enemy.y = Layouts.GameWindowLayout.y - 10
     elseif spawnSide == 3 then
-        self.x = ScreenWidth + 10
-        self.y = math.random(0, Layouts.GameWindowLayout.height)
+        enemy.x = ScreenWidth + 10
+        enemy.y = math.random(0, Layouts.GameWindowLayout.height)
     elseif spawnSide == 4 then
-        self.x = math.random(0, ScreenWidth)
-        self.y = (Layouts.GameWindowLayout.y + Layouts.GameWindowLayout.height) + 10
+        enemy.x = math.random(0, ScreenWidth)
+        enemy.y = (Layouts.GameWindowLayout.y + Layouts.GameWindowLayout.height) + 10
     end
 
-    self.sides = 3
-    self.maxHp = 2 + (math.ceil(self.sides/3))
-    self.hp = self.maxHp
-    self.speed = 1*60
-    self.dead = false
-    self.damage = 1
-    self.gold = 1
-    self.xp = 1
+    enemy.id = #GameState.Enemys + 1
+    enemy.sides = 3
+    enemy.maxHp = 2 + (math.ceil(enemy.sides/3))
+    enemy.hp = enemy.maxHp
+    enemy.speed = 1*60
+    enemy.dead = false
+    enemy.damage = 1
+    enemy.gold = 1
+    enemy.xp = 1
 
-    print( "Spawning Enemy x: " .. enemy.x .. " y: " .. enemy.y)
+    print( "Spawning Enemy " ..enemy.id)
     return enemy
 end
 
 function Enemy:RemoveHp(amount)
-    print( "Enemy took " .. amount .. " damage" )
+    print( "Enemy " ..self.id .. " took " .. amount .. " damage" )
     self.hp = self.hp - amount
     print( "Hp remaining " .. self.hp .. "/" .. self.maxHp)
     if self.hp <= 0 then
