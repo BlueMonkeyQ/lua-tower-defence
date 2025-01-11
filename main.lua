@@ -51,6 +51,12 @@ function love.load()
         ControlsLayout = {
             x = 0,
             y = ScreenHeight-50,
+        },
+        DebugLayout = {
+            x = 0,
+            y = 50,
+            width = ScreenWidth/5,
+            height = 50,
         }
     }
 
@@ -59,14 +65,21 @@ function love.load()
     GameState.State = 0
     GameState.Timer = 0
     GameState.Stats = false
+    GameState.Debug = true
+    GameState.Buy = false
+    GameState.Wave = 0
+    GameState.NumEnemies = 0
+    GameState.CreatedEnemies = 0
+    GameState.WaveTimer = 0
+    GameState.GameSpeed = 1
 
     Player:Init((Layouts.GameWindowLayout.width/2) - 10, (Layouts.GameWindowLayout.height/2) + 50)
     
     Enemys = {}
     Projectiles = {}
 
-    TickCounter = 0
-    TickDuration = 0.5
+    NextWaveTime = 15
+    NextSpawnTime = 1
 
     NearestEnemy = nil
     LastAttackTime = 0
@@ -79,11 +92,36 @@ function love.update(dt)
 
     -- Game is Running
     if GameState.State == 1 then
-        GameState.Timer = GameState.Timer + dt
-        
+        GameState.Timer = GameState.Timer + dt * GameState.GameSpeed
+        GameState.WaveTimer = GameState.WaveTimer + dt * GameState.GameSpeed
+
+        if Player.dead then
+            Enemys = {}
+            Projectiles = {}
+            GameEnd()
+        end
+
+        -- 
+        if GameState.WaveTimer >= NextSpawnTime and GameState.CreatedEnemies < GameState.NumEnemies then
+            local numEnemies = math.floor(GameState.NumEnemies * (NextWaveTime/100))
+            print( "Spawning " .. numEnemies .. "Enemies" )
+            for i = 1, numEnemies, 1 do
+                local enemy = Enemy:SpawnEnemy()
+                table.insert(Enemys, enemy)
+                GameState.CreatedEnemies = GameState.CreatedEnemies + 1
+            end
+            NextSpawnTime = NextSpawnTime + 1
+            print( "Created Enemies " .. GameState.CreatedEnemies)
+        end
+
+        -- 
+        if GameState.WaveTimer >= NextWaveTime and #Enemys == 0 then
+            WaveStart()
+        end
+          
         -- Auto Attacking
         if Player.abilities.auto and Player.abilities.autoOn then
-            LastAttackTime = LastAttackTime + dt
+            LastAttackTime = LastAttackTime + dt * GameState.GameSpeed
             local interval = 1 / Player.attackSpeed
             if LastAttackTime >= interval then
                 print("Attack Speed Interval: " ..interval)
@@ -97,7 +135,7 @@ function love.update(dt)
     
         -- Health Regen
         if Player.healthRegen > 0 and Player.hp < Player.maxHp then
-            LastHealthTime = LastHealthTime + dt
+            LastHealthTime = LastHealthTime + dt * GameState.GameSpeed
             local interval = 1 / Player.healthRegen
             if LastHealthTime >= interval then
                 print("Health Regen Interval: " ..interval)
@@ -109,25 +147,24 @@ function love.update(dt)
         -- Update Enemy postion to player
         for i = #Enemys, 1, -1 do
             local e = Enemys[i]
-            e.x = e.x + (math.cos( EnemyPlayerAngel(e) ) * e.speed * dt)
-            e.y = e.y + (math.sin( EnemyPlayerAngel(e) ) * e.speed * dt)
+            e.x = e.x + (math.cos( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
+            e.y = e.y + (math.sin( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
     
             -- Detect Collision with player
             if DistanceBetween(e.x, e.y, Player.x, Player.y) < 10 then
                 print("Enemy " .. i .. " Collided, deleting enemy")
                 Player:removeHp(e.damage)
                 table.remove(Enemys, i)
-    
                 if Player.dead then
-                    GameEnd()
+                    return
                 end
             end
         end
     
         -- Update Projectile postion
         for _, p in ipairs(Projectiles) do
-            p.x = p.x + (math.cos( p.direction ) * p.speed * dt)
-            p.y = p.y + (math.sin( p.direction ) * p.speed * dt)
+            p.x = p.x + (math.cos( p.direction ) * p.speed * (dt * GameState.GameSpeed))
+            p.y = p.y + (math.sin( p.direction ) * p.speed * (dt * GameState.GameSpeed))
         end
     
         -- Check if any projectiles are out of bounds
@@ -145,7 +182,7 @@ function love.update(dt)
             for j, p in ipairs(Projectiles) do
                 if DistanceBetween( e.x, e.y, p.x, p.y ) < 10 then
                     print ( "Projectile " .. j .. " collided with enemy " .. i )
-                    e:RemoveHp(1)
+                    e:RemoveHp(Player.damage)
                     if e.dead then
                         print( "Enemy Killed +" ..e.xp .."xp " .. e.gold .. "$")
                         Player.gold = Player.gold + e.gold
@@ -184,13 +221,20 @@ function love.draw()
 
     if GameState.State == 0 then
         
-        ControlsLayout( "q) Quit | s) Start | c) Stats" )
+        ControlsLayout( "q) Quit | s) Start | c) Stats | b) Buy" )
 
     elseif GameState.State == 1 then
 
+        -- Handles Spawned Enemies
         for _, e in ipairs(Enemys) do
-            love.graphics.setColor(1,0,0)
-            love.graphics.rectangle("fill", e.x, e.y, 10, 10)
+            local alpha = e.hp / e.maxHp -- Gets the Transparency of the enemy on % health left
+            local vertices = e:Shape(10)
+
+            love.graphics.setColor(1,0,0, alpha)
+            love.graphics.polygon("fill", vertices)
+            
+            love.graphics.setColor(1,0,0,1)
+            love.graphics.polygon("line", vertices)
         end
     
         for _, p in ipairs(Projectiles) do
@@ -205,7 +249,13 @@ function love.draw()
     DrawPlayer()
 
     if GameState.Stats then
-        StatsPopup()
+        StatsWindow()
+    elseif GameState.Buy then
+        BuyWindow()
+    end
+
+    if GameState.Debug then
+        DebugWindow()
     end
 end
 
@@ -214,6 +264,7 @@ function GameStart()
     GameState.State = 1
     GameState.Timer = 0
     Player.hp = Player.maxHp
+    WaveStart()
 end
 
 --[[
@@ -224,56 +275,66 @@ function GameEnd()
     print( "Game Ending ")
     GameState.State = 0
     GameState.Timer = 0
+    GameState.Wave = 0
+    GameState.NumEnemies = 0
+    Player.dead = false
     Player.hp = Player.maxHp
-    for k in pairs(Enemys) do
-        Enemys[k] = nil
-    end
-    for k in pairs(Projectiles) do
-        Projectiles[k] = nil
-    end
 end
 
 -- Handles all key press events
 function love.keypressed(key)
     print("Key pressed: " .. key)
 
-    if GameState.State == 0 then
+    if GameState.Buy then -- Handling Buy Window
+        if (key == "q" or key == "Q") then
+            GameState.Buy = not GameState.Buy
+        elseif key == "b" or key == "B" then
+            GameState.Buy = not GameState.Buy
+        end
+
+    elseif GameState.Stats then -- Handling Stats Window
+        if (key == "q" or key == "Q") then
+            GameState.Stats = not GameState.Stats
+        elseif key == "c" or key == "C" then
+            GameState.Stats = not GameState.Stats
+        end
+
+    elseif GameState.State == 0 then -- Main Menu
         if key == "s" or key == "S" then
             GameStart()
+        elseif key == "b" or key == "B" then
+            GameState.Buy = not GameState.Buy
+        elseif key == "c" or key == "C" then
+            GameState.Stats = not GameState.Stats
         end
-    end
-
-    if GameState.State == 1 then
+    
+    elseif GameState.State == 1 then -- Running Game
         if key == "v" or key == "V" and Player.abilities.auto then
             Player.abilities.autoOn = not Player.abilities.autoOn
         elseif key == 'q' or key == 'Q' then
             GameEnd()
+        elseif key == "c" or key == "C" then
+            GameState.Stats = not GameState.Stats
         -- dev
+        elseif key == "1" then
+            GameState.GameSpeed = 1
+        elseif key == "2" then
+            GameState.GameSpeed = 2
+        elseif key == "3" then
+            GameState.GameSpeed = 3
         elseif key == "space" then
             local enemy = Enemy:SpawnEnemy()
             table.insert(Enemys, enemy)
         end
     end
 
+
     -- dev
     if key == "escape" then
         love.event.quit()
+    elseif key == "d" then
+        GameState.Debug = not GameState.Debug
     end
-
-    -- Handling Stats Scren
-    if GameState.Stats then
-        if (key == "q" or key == "Q") then
-            GameState.Stats = not GameState.Stats
-        elseif key == "c" or key == "C" then
-            GameState.Stats = not GameState.Stats
-        end
-        return
-    end
-
-    if key == "c" or key == "C" then
-        GameState.Stats = not GameState.Stats
-    end
-
 end
 
 --[[
@@ -315,30 +376,42 @@ function SpawnProjectile(userInput)
 end
 
 function FindNearestEnemy()
+    local nearestEnemy = nil
+    local nearestDistance = math.huge
+
     local closest = 0
     local index = nil
     local enemy = nil
     for i, e in ipairs(Enemys) do
         local distance = DistanceBetween(e.x, e.y, Player.x, Player.y)
-        if i == 1 then
-            closest = distance
-            index = i
-            enemy = e
+        
+        if distance <= Player.attackRadius then
+             if distance < nearestDistance then
+                index = i
+                nearestEnemy = e
+                nearestDistance = distance
+            end
         end
+        
+        -- if i == 1 then
+        --     closest = distance
+        --     index = i
+        --     enemy = e
+        -- end
 
-        if distance < closest then
-            closest = distance
-            index = i
-            enemy = e
-        end
+        -- if distance < closest then
+        --     closest = distance
+        --     index = i
+        --     enemy = e
+        -- end
     end
 
-    if enemy == nil then
+    if nearestEnemy == nil then
         print("No enemys nearby")
         return nil
     else
-        print("Nearest Enemy " .. index .. " x: " .. enemy.x .. " y: " .. enemy.y)
-        return enemy
+        print("Nearest Enemy " .. index .. " x: " .. nearestEnemy.x .. " y: " .. nearestEnemy.y)
+        return nearestEnemy
     end
 end
 
@@ -373,4 +446,19 @@ function EndGame()
 
     -- -- Remove all projectiles
     -- Projectiles = nil
+end
+
+-- 
+function WaveStart()
+    if GameState.Wave == 0 then
+        GameState.Wave = 1
+        GameState.NumEnemies = 15
+    else
+        GameState.Wave = GameState.Wave + 1
+        GameState.NumEnemies = math.ceil(GameState.NumEnemies * 1.25)
+    end
+    GameState.CreatedEnemies = 0
+    GameState.WaveTimer = 0
+    NextSpawnTime = 1
+    print( "Starting Wave " .. GameState.Wave .. ", " .. GameState.NumEnemies .. " Enemies")
 end

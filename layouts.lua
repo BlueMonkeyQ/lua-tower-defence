@@ -10,7 +10,7 @@ function GameWindow()
 end
 function DrawPlayer()
     love.graphics.setColor(0,0,1)
-    love.graphics.rectangle("fill", Player.x, Player.y, 10, 10)
+    love.graphics.rectangle("fill", Player.x, Player.y, Player.width, Player.height)
 end
 
 function Popup(r,g,b)
@@ -18,7 +18,7 @@ function Popup(r,g,b)
     love.graphics.rectangle("fill", Layouts.PopupLayout.x, Layouts.PopupLayout.y, Layouts.PopupLayout.width, Layouts.PopupLayout.height)
 end
 
-function StatsPopup()
+function StatsWindow()
     Popup(128,128,128)
     love.graphics.setFont(love.graphics.newFont(40))
     love.graphics.setColor(0,0,0)
@@ -26,6 +26,22 @@ function StatsPopup()
     love.graphics.printf("Gold " ..Player.gold, Layouts.PopupLayout.x, Layouts.PopupLayout.y*2, ScreenWidth, "left")
     love.graphics.printf("Kills " ..Player.killCount, Layouts.PopupLayout.x, Layouts.PopupLayout.y*3, ScreenWidth, "left")
     love.graphics.printf("Run Time " ..math.floor(GameState.Timer/60) .. "." ..math.floor(GameState.Timer%60), Layouts.PopupLayout.x, Layouts.PopupLayout.y*4, ScreenWidth, "left")
+end
+
+function DebugWindow()
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Wave " .. GameState.Wave, Layouts.DebugLayout.x, Layouts.DebugLayout.y, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Time " .. math.floor(GameState.WaveTimer), Layouts.DebugLayout.x, Layouts.DebugLayout.y + 25, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Max " .. GameState.NumEnemies, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 50, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Spawned " .. GameState.CreatedEnemies, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 75, Layouts.DebugLayout.width, "left")
+
+    love.graphics.setColor(1, 1, 1)  -- Set the color to white for the radius circle
+    -- love.graphics.circle(mode,x,y,radius)
+    love.graphics.circle("line", Player.x + Player.width / 2, Player.y + Player.height / 2, Player.attackRadius)
+end
+
+function BuyWindow()
+    Popup(128,128,128)
 end
 
 function Footer()
