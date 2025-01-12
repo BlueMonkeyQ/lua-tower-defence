@@ -11,19 +11,28 @@ function Player:Init(x, y)
     self.maxHp = 5
     self.hp = Player.maxHp
     self.healthRegen = .25
-    self.damage = 1
-    self.attackSpeed = 2
-    self.attackRadius = 100
+    self.damage = 10
+    self.attackSpeed = 10
+    self.attackRadius = 150
     self.dead = false
-    self.gold = 0
+    self.value = 0
     self.killCount = 0
-
+    self.collectorsCount = 2
+    self.collectors = {}
     self.abilities = {
         auto = true,
         autoOn = true,
-        spread = false,
+        spread = true,
         chain = true,
-        chainAmount = 2,
+        chainAmount = 1,
+        shield = {
+            unlocked = true,
+            active = true,
+            radius = 50,
+            rechargeRate = .3,
+            maxHP = 3,
+            hp = 0,
+        }
     }
     return player
 end
@@ -72,4 +81,38 @@ function Player:Abilities(e)
         end
     end
     print( "----------  ----------")
+end
+
+Collector = {}
+Collector.__index = Collector
+
+function Collector:SpawnCollector()
+    local collector = setmetatable({}, { __index = self })
+
+    collector.id = #Player.collectors + 1
+    collector.speed = 1*60
+    collector.active = false
+    collector.reTurn = false
+    collector.x = Player.x
+    collector.y = Player.y
+    collector.dId = 0
+    collector.dx = 0
+    collector.dy = 0
+    collector.direction = 0
+    collector.value = 0
+
+    print( "Spawning Collector " ..collector.id)
+    return collector
+end
+
+function Collector:Reset()
+    self.active = false
+    self.reTurn = false
+    self.x = Player.x
+    self.y = Player.y
+    self.dId = 0
+    self.dx = 0
+    self.dy = 0
+    self.direction = 0
+    self.value = 0
 end

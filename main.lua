@@ -38,7 +38,13 @@ function love.load()
         HealthBarLayout = {
             x = 0,
             y = 450,
-            width = ScreenWidth,
+            width = ScreenWidth/2,
+            height = 50,
+        },
+        ShieldBarLayout = {
+            x = ScreenWidth/2,
+            y = 450,
+            width = ScreenWidth/2,
             height = 50,
         },
         StatusButtonLayout = {
@@ -60,6 +66,10 @@ function love.load()
         }
     }
 
+    Sounds = {
+        AutoAttack = "data/sounds/autoattack.wav"
+    }
+
     -- State = 0 (Menu) / 1 (Game Start)
     GameState = {}
     GameState.State = 0
@@ -74,11 +84,17 @@ function love.load()
     GameState.GameSpeed = 1
     GameState.Enemys = {}
     GameState.Projectiles = {}
+    GameState.Drops = {}
     GameState.Chains = {}
 
     Player:Init((Layouts.GameWindowLayout.width/2) - 10, (Layouts.GameWindowLayout.height/2) + 50)
+    for i = 1, Player.collectorsCount, 1 do
+        local c = Collector:SpawnCollector()
+        table.insert(Player.collectors, c)
+    end
 
     EnemyIdCounter = 1
+    DropIdCounter = 1
     ProjectileIdCounter = 1
 
     NextWaveTime = 15
@@ -87,6 +103,7 @@ function love.load()
     NearestEnemy = nil
     LastAttackTime = 0
     LastHealthTime = 0
+    LastShieldTime = 0
 
     GameTimer = 0
 end
@@ -97,15 +114,6 @@ function love.update(dt)
     if GameState.State == 1 then
         GameState.Timer = GameState.Timer + dt * GameState.GameSpeed
         GameState.WaveTimer = GameState.WaveTimer + dt * GameState.GameSpeed
-
-        if #GameState.Enemys > 0 then
-            print( "---------- Enemy List ----------")
-            for _, e in ipairs(GameState.Enemys) do
-                print("Enemy " .. e.id)
-            end
-            print( "----------  ----------")
-        end
-
 
         if Player.dead then
             GameState.Enemys = {}
@@ -128,6 +136,10 @@ function love.update(dt)
 
         -- 
         if GameState.WaveTimer >= NextWaveTime and #GameState.Enemys == 0 then
+            GameState.Drops = {}
+            for _, c in ipairs(Player.collectors) do
+                c:Reset()
+            end
             WaveStart()
         end
           
@@ -140,6 +152,8 @@ function love.update(dt)
                 NearestEnemy = FindNearestEnemy()
                 if NearestEnemy ~= nil then
                     SpawnProjectile()
+                    local sound = love.audio.newSource(Sounds.AutoAttack, "static")
+                    sound:play()
                 end
                 LastAttackTime = LastAttackTime - interval
             end
@@ -155,24 +169,73 @@ function love.update(dt)
                 LastHealthTime = LastHealthTime - interval
             end
         end
-    
-        -- Update Enemy postion to player
-        for i = #GameState.Enemys, 1, -1 do
-            local e = GameState.Enemys[i]
-            e.x = e.x + (math.cos( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
-            e.y = e.y + (math.sin( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
-    
-            -- Detect Collision with player
-            if DistanceBetween(e.x, e.y, Player.x, Player.y) < 10 then
-                print("Enemy " .. i .. " Collided, deleting enemy")
-                Player:removeHp(e.damage)
-                table.remove(GameState.Enemys, i)
-                if Player.dead then
-                    return
+
+        -- Shield Regen
+        if Player.abilities.shield.hp <= Player.abilities.shield.maxHP then
+            LastShieldTime = LastShieldTime + dt * GameState.GameSpeed
+            local interval = 1 / Player.abilities.shield.rechargeRate
+            
+            if LastShieldTime >= interval then
+                print("Shield Regen Interval: " ..interval)
+                if Player.abilities.shield.hp <= 0 then
+                    Player.abilities.shield.hp = Player.abilities.shield.maxHP
+                    Player.abilities.shield.active = true
+                else
+                    Player.abilities.shield.hp = Player.abilities.shield.hp + 1
+                    Player.abilities.shield.active = true
+                end
+                LastShieldTime = LastShieldTime - interval
+            end
+        end
+
+        -- Handle Collectors getting drops
+        print( "---------- Collectors ----------")
+        for _, c in ipairs(Player.collectors) do
+            if c.active then
+                -- Move the collector to the drop
+                c.x = c.x + (math.cos( c.direction ) * c.speed * (dt * GameState.GameSpeed))
+                c.y = c.y + (math.sin( c.direction ) * c.speed * (dt * GameState.GameSpeed))
+
+                -- Check the collector made it to its destination
+                if DistanceBetween(c.x, c.y, c.dx, c.dy) < 10 then
+                    -- Going towards player
+                    if c.reTurn then
+                        print( "Collector " ..c.id .. " back to player" )
+                        Player.value = Player.value + c.value
+                        c:Reset()
+
+                    -- Going towards drop
+                    else
+                        print( "Collector " .. c.id .. " picked up Drop " .. c.dId )
+                        c.dx = Player.x
+                        c.dy = Player.y
+                        c.direction = GetAngle(c.dx, c.dy,c.x, c.y)
+                        c.reTurn = true
+                        for j, drop in ipairs(GameState.Drops) do
+                            if drop.id == c.dId then
+                                table.remove(GameState.Drops, j)
+                                break
+                            end
+                        end
+                    end
+                end
+            
+            else
+                local d = FindNearestDrop()
+                if d ~= nil then
+                    d.beingCollected = true
+                    c.active = true
+                    c.dx = d.x
+                    c.dy = d.y
+                    c.dId = d.id
+                    c.direction = GetAngle(c.x, c.y, c.dx, c.dy) + math.pi
+                    c.value = d.value
+                    print( "Collector " ..c.id .. " going to Drop " ..d.id )
                 end
             end
         end
-    
+        print( "----------  ----------")
+
         -- Update Projectile postion
         for i, p in ipairs(GameState.Projectiles) do
             p.x = p.x + (math.cos( p.direction ) * p.speed * (dt * GameState.GameSpeed))
@@ -184,7 +247,6 @@ function love.update(dt)
                     print( "Projectile " ..p.id .. " collided with Enemy " ..e.id )
                     e:RemoveHp(Player.damage)
                     Player:Abilities(e)
-
                     table.remove(GameState.Projectiles, i)
                     i = i -1
                 end
@@ -198,12 +260,48 @@ function love.update(dt)
             end
         end
 
+        -- Update Enemy postion to player
+        for i = #GameState.Enemys, 1, -1 do
+            local e = GameState.Enemys[i]
+            e.x = e.x + (math.cos( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
+            e.y = e.y + (math.sin( EnemyPlayerAngel(e) ) * e.speed * (dt * GameState.GameSpeed))
+            
+            -- Detect Collision with shield if active
+            if Player.abilities.shield.active then
+                if DistanceBetween(e.x, e.y, Player.x, Player.y) <= Player.abilities.shield.radius then
+                    print( "Enemy " .. i .. " Collided with shield")
+                    Player.abilities.shield.hp = Player.abilities.shield.hp - e.damage
+                    if Player.abilities.shield.hp <= 0 then
+                        Player.abilities.shield.active = false
+                        Player.abilities.shield.hp = 0
+                    end
+                    table.remove(GameState.Enemys, i)
+                    if Player.dead then
+                        return
+                    end
+                end
+            end
+
+            -- Detect Collision with player
+            if DistanceBetween(e.x, e.y, Player.x, Player.y) < 10 then
+                print( "Enemy " .. i .. " Collided with player" )
+                Player:removeHp(e.damage)
+                table.remove(GameState.Enemys, i)
+                if Player.dead then
+                    return
+                end
+            end
+        end
+
+        -- Removes Enemys
         for i, e in ipairs(GameState.Enemys) do
             if e.dead then
+                SpawnDrops(e)
                 table.remove(GameState.Enemys, i)
             end
         end
 
+        -- Handles Chain
         local currentTime = love.timer.getTime()
         for i = #GameState.Chains, 1, -1 do
             local chain = GameState.Chains[i]
@@ -230,6 +328,19 @@ function love.draw()
             love.graphics.setColor(1, 0, 0)
             love.graphics.line(chain.startEnemy.x, chain.startEnemy.y, chain.endEnemy.x, chain.endEnemy.y)
         end
+
+        -- Handles Spawned Drops
+        for _, d in ipairs(GameState.Drops) do
+            love.graphics.setColor(1,1,1)
+            love.graphics.circle("fill", d.x, d.y, d.r )
+        end
+
+        -- Handle Collectors
+        for _, c in ipairs(Player.collectors) do
+            love.graphics.setColor(1,1,0)
+            love.graphics.rectangle("fill", c.x, c.y, 10, 10)
+        end
+
         -- Handles Spawned Enemies
         for _, e in ipairs(GameState.Enemys) do
             local alpha = e.hp / e.maxHp -- Gets the Transparency of the enemy on % health left
@@ -241,13 +352,15 @@ function love.draw()
             love.graphics.setColor(1,0,0,1)
             love.graphics.polygon("line", vertices)
         end
-    
+        
+        -- Handle Projectiles
         for _, p in ipairs(GameState.Projectiles) do
             love.graphics.setColor(0,1,0)
             love.graphics.rectangle("fill", p.x, p.y, 10, 10)
         end
 
         Healthbar()
+        Shieldbar()
         ControlsLayout( "q) Quit | v) Auto Shoot | c) Stats" )
     end
 
@@ -269,6 +382,11 @@ function GameStart()
     GameState.State = 1
     GameState.Timer = 0
     Player.hp = Player.maxHp
+    
+    if Player.abilities.shield.unlocked then
+        Player.abilities.shield.active = true
+        Player.abilities.shield.hp = Player.abilities.shield.maxHP
+    end
     WaveStart()
 end
 
@@ -374,6 +492,19 @@ function SpawnProjectile()
     end
 end
 
+function SpawnDrops(e)
+    local drop = {}
+    drop.id = DropIdCounter
+    drop.x = e.x
+    drop.y = e.y
+    drop.r = 10
+    drop.value = e.value
+    drop.beingCollected = false
+    drop.pickedUp = false
+    DropIdCounter = DropIdCounter + 1
+    table.insert(GameState.Drops, drop)
+end
+
 function FindNearestEnemy()
     local nearestEnemy = nil
     local nearestDistance = math.huge
@@ -401,6 +532,9 @@ function FindNearestEnemyviaEnemy(e)
     local nearestEnemy = nil
     local nearestDistance = math.huge  -- Start with a very large number for comparison
     
+    if #GameState.Enemys <= 1 then
+        return
+    end
     for _, enemy in ipairs(GameState.Enemys) do
         print("Active " .. e.id .. " Enemy " .. enemy.id)
         if enemy.id ~= e.id then
@@ -424,6 +558,14 @@ end
 -- Returns the arc tangent of the player to the enemy
 function EnemyPlayerAngel(enemy)
     return math.atan2( Player.y - enemy.y, Player.x - enemy.x )
+end
+
+function DropPlayerAngel(drop)
+    return math.atan2( Player.y - drop.y, Player.x - drop.x )
+end
+
+function GetAngle(x1,y1,x2,y2)
+    return math.atan2( y1 - y2, x1 - x2 )
 end
 
 -- Returns the arc tangent of the player to mouse positon
@@ -467,4 +609,20 @@ function WaveStart()
     GameState.WaveTimer = 0
     NextSpawnTime = 1
     print( "Starting Wave " .. GameState.Wave .. ", " .. GameState.NumEnemies .. " Enemies")
+end
+
+function FindNearestDrop()
+    local closestDrop = nil
+    local closestDistance = math.huge
+
+    for _, d in ipairs(GameState.Drops) do
+        if not d.beingCollected then
+            local dist = DistanceBetween(d.x, d.y, Player.x, Player.y)
+            if dist < closestDistance then
+                closestDrop = d
+                closestDistance = dist
+            end
+        end
+    end
+    return closestDrop
 end

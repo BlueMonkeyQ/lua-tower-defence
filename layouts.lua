@@ -8,9 +8,15 @@ function GameWindow()
     love.graphics.setColor(0,1,0)
     love.graphics.rectangle("line", Layouts.GameWindowLayout.x, Layouts.GameWindowLayout.y, Layouts.GameWindowLayout.width, Layouts.GameWindowLayout.height)
 end
+
 function DrawPlayer()
     love.graphics.setColor(0,0,1)
     love.graphics.rectangle("fill", Player.x, Player.y, Player.width, Player.height)
+
+    if Player.abilities.shield.unlocked and Player.abilities.shield.active then
+        love.graphics.setColor(0,0,1)
+       love.graphics.circle("line", Player.x + Player.width / 2, Player.y + Player.height / 2,Player.abilities.shield.radius)     
+    end
 end
 
 function Popup(r,g,b)
@@ -34,6 +40,11 @@ function DebugWindow()
     love.graphics.printf("Time " .. math.floor(GameState.WaveTimer), Layouts.DebugLayout.x, Layouts.DebugLayout.y + 25, Layouts.DebugLayout.width, "left")
     love.graphics.printf("Max " .. GameState.NumEnemies, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 50, Layouts.DebugLayout.width, "left")
     love.graphics.printf("Spawned " .. GameState.CreatedEnemies, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 75, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Hp " .. Player.hp .. "/" .. Player.maxHp, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 100, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Shield " .. Player.abilities.shield.hp .. "/" .. Player.abilities.shield.maxHP, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 125, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Value " .. Player.value, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 150, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Drops " .. #GameState.Drops, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 175, Layouts.DebugLayout.width, "left")
+    love.graphics.printf("Collectors " .. #Player.collectors, Layouts.DebugLayout.x, Layouts.DebugLayout.y + 200, Layouts.DebugLayout.width, "left")
 
     love.graphics.setColor(1, 1, 1)  -- Set the color to white for the radius circle
     -- love.graphics.circle(mode,x,y,radius)
@@ -52,14 +63,24 @@ end
 
 function Healthbar()
     
-    -- Healthbar Background
-    love.graphics.setColor(0.2, 0.2, 0.2)  -- Dark gray for the empty bar
+    -- Background
+    love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle("fill", Layouts.HealthBarLayout.x, Layouts.HealthBarLayout.y, Layouts.HealthBarLayout.width, Layouts.HealthBarLayout.height)
 
     -- Healthbar
-    love.graphics.setColor(0, 1, 0)  -- Green color for the health bar
+    love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", Layouts.HealthBarLayout.x, Layouts.HealthBarLayout.y, Layouts.HealthBarLayout.width * (Player.hp / Player.maxHp), Layouts.HealthBarLayout.height)
 
+end
+
+function Shieldbar()
+        -- Background
+        love.graphics.setColor(0.2, 0.2, 0.2)
+        love.graphics.rectangle("fill", Layouts.ShieldBarLayout.x, Layouts.ShieldBarLayout.y, Layouts.ShieldBarLayout.width, Layouts.ShieldBarLayout.height)
+    
+        -- ShieldBar
+        love.graphics.setColor(1, 0, 0)
+        love.graphics.rectangle("fill", Layouts.ShieldBarLayout.x, Layouts.ShieldBarLayout.y, Layouts.ShieldBarLayout.width * (Player.abilities.shield.hp / Player.abilities.shield.maxHP), Layouts.ShieldBarLayout.height)
 end
 
 function ControlsLayout(text)

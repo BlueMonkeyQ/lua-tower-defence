@@ -34,7 +34,7 @@ function Enemy:SpawnEnemy()
     enemy.speed = 1*60
     enemy.dead = false
     enemy.damage = 1
-    enemy.gold = 1
+    enemy.value = 1
     enemy.xp = 1
 
     print( "Spawning Enemy " ..enemy.id)
