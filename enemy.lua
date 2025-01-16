@@ -9,44 +9,99 @@ Spawn Direction:
     3: right
     4: down
 --]]
-function Enemy:SpawnEnemy()
-    local enemy = setmetatable({}, { __index = self })
-    local spawnSide = math.random(1,4)
 
-    if spawnSide == 1 then
-        enemy.x = -10
-        enemy.y = math.random(0, Layouts.GameWindowLayout.height)
-    elseif spawnSide == 2 then
-        enemy.x = math.random(0, ScreenWidth)
-        enemy.y = Layouts.GameWindowLayout.y - 10
-    elseif spawnSide == 3 then
-        enemy.x = ScreenWidth + 10
-        enemy.y = math.random(0, Layouts.GameWindowLayout.height)
-    elseif spawnSide == 4 then
-        enemy.x = math.random(0, ScreenWidth)
-        enemy.y = (Layouts.GameWindowLayout.y + Layouts.GameWindowLayout.height) + 10
-    end
-
-    enemy.id = #GameState.Enemys + 1
-    enemy.sides = 3
-    enemy.maxHp = 2 + (math.ceil(enemy.sides/3))
+function Enemy:new(id, sides)
+    local enemy = setmetatable({}, self)
+    enemy.id = id
+    enemy.sides = sides
+    enemy.maxHp = 2 * sides
     enemy.hp = enemy.maxHp
+    enemy.radius = 10
     enemy.speed = 1*60
-    enemy.dead = false
     enemy.damage = 1
     enemy.value = 1
-    enemy.xp = 1
+    enemy.score = 1
+    enemy.active = false
+    enemy.dead = false
+    
+    enemy.spawnTime = math.random(1,30)
 
-    print( "Spawning Enemy " ..enemy.id)
+    local spawnSide = math.random(1,4)
+    if spawnSide == 1 then
+        enemy.x = -10
+        enemy.y = math.random(0, BaseLayouts.GameWindowLayout.height)
+    elseif spawnSide == 2 then
+        enemy.x = math.random(0, ScreenWidth)
+        enemy.y = BaseLayouts.GameWindowLayout.y - 10
+    elseif spawnSide == 3 then
+        enemy.x = ScreenWidth + 10
+        enemy.y = math.random(0, BaseLayouts.GameWindowLayout.height)
+    elseif spawnSide == 4 then
+        enemy.x = math.random(0, ScreenWidth)
+        enemy.y = (BaseLayouts.GameWindowLayout.y + BaseLayouts.GameWindowLayout.height) + 10
+    end
+
     return enemy
 end
 
+function Enemy:update(dt)
+    -- Position
+    self.x = self.x + (math.cos( self:playerAngle() ) * self.speed * (dt * GameState.GameSpeed))
+    self.y = self.y + (math.sin( self:playerAngle() ) * self.speed * (dt * GameState.GameSpeed))
+    
+    -- Collision
+    if Player.abilities.shield.active then
+        if DistanceBetween(self.x, self.y, Player.x, Player.y) <= Player.abilities.shield.radius then
+            Player.abilities.shield.hp = Player.abilities.shield.hp - self.damage
+            if Player.abilities.shield.hp <= 0 then
+                Player.abilities.shield.active = false
+                Player.abilities.shield.hp = 0
+            end
+            self.dead = true
+            if Player.dead then
+                return
+            end
+        end
+    else
+        if DistanceBetween(self.x, self.y, Player.x, Player.y) < 10 then
+            Player:removeHp(self.damage)
+            self.dead = true
+            if Player.dead then
+                return
+            end
+        end
+    end
+end
+
+function Enemy:playerAngle()
+    return math.atan2( Player.y - self.y, Player.x - self.x )
+end
+
+-- function Enemy:SpawnEnemy()
+--     local enemy = setmetatable({}, { __index = self })
+--     local spawnSide = math.random(1,4)
+
+--     if spawnSide == 1 then
+--         enemy.x = -10
+--         enemy.y = math.random(0, BaseLayouts.GameWindowLayout.height)
+--     elseif spawnSide == 2 then
+--         enemy.x = math.random(0, ScreenWidth)
+--         enemy.y = BaseLayouts.GameWindowLayout.y - 10
+--     elseif spawnSide == 3 then
+--         enemy.x = ScreenWidth + 10
+--         enemy.y = math.random(0, BaseLayouts.GameWindowLayout.height)
+--     elseif spawnSide == 4 then
+--         enemy.x = math.random(0, ScreenWidth)
+--         enemy.y = (BaseLayouts.GameWindowLayout.y + BaseLayouts.GameWindowLayout.height) + 10
+--     end
+--     return enemy
+-- end
+
 function Enemy:RemoveHp(amount)
-    print( "Enemy " ..self.id .. " took " .. amount .. " damage" )
     self.hp = self.hp - amount
-    print( "Hp remaining " .. self.hp .. "/" .. self.maxHp)
     if self.hp <= 0 then
         self.dead = true
+        Player.killCount = Player.killCount + 1
     end
 end
 

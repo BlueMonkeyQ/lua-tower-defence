@@ -7,40 +7,56 @@ function Player:Init(x, y)
     self.y = y
     self.width = 10
     self.height = 10
-    self.xp = 0
-    self.maxHp = 5
-    self.hp = Player.maxHp
-    self.healthRegen = .25
-    self.damage = 10
-    self.attackSpeed = 10
-    self.attackRadius = 150
     self.dead = false
     self.value = 0
     self.killCount = 0
-    self.collectorsCount = 2
-    self.collectors = {}
+    self.health = {
+        maxHp = 10,
+        hp = 0,
+        regenAmount = 1,
+        regenRate = .25,
+    }
+    self.attack = {
+        dpsInterval = 0,
+        dps = 0,
+        count = 1,
+        damage = 10,
+        rate = 5,
+        mult = 1,
+        radius = 150,
+    }
+    self.collector = {
+        count = 5,
+        speed = 5,
+        collectors = {}
+    }
     self.abilities = {
-        auto = true,
-        autoOn = true,
-        spread = true,
-        chain = true,
-        chainAmount = 1,
+        chain = {
+            unlocked = true,
+            dpsInterval = 0,
+            dps = 0,
+            bounce = 20,
+            radius = 300,
+        },
         shield = {
             unlocked = true,
             active = true,
             radius = 50,
+            amount = 1,
             rechargeRate = .3,
-            maxHP = 3,
+            maxHP = 5,
             hp = 0,
         }
     }
     return player
 end
 
+function Player:update(dt)
+    
+end
+
 function Player:removeHp(amount)
     self.hp = self.hp - amount
-    print( "Player took " .. amount .. " damage" )
-    print( "Hp remaining " .. self.hp .. "/" .. self.maxHp)
     if self.hp <= 0 then
         self.hp = 0
         self.dead = true
@@ -49,28 +65,23 @@ end
 
 function Player:addHp(amount)
     self.hp = self.hp + amount
-    print( "Player healed " .. amount )
 
     if self.hp > self.maxHp then
-        print( "Overhealed, setting to max HP" )
         self.hp = self.maxHp
     end
-
-    print( "Hp " .. self.hp .. "/" .. self.maxHp)
 end
 
 function Player:Abilities(e)
-    print( "---------- Abilities ----------")
-    if self.abilities.chain then
+    if self.abilities.chain.unlocked then
         local currentEnemy = e
-        for i = 1, self.abilities.chainAmount, 1 do
-            print( "Chain Ability Bounce " .. i )
-            local nearestEnemy = FindNearestEnemyviaEnemy(currentEnemy)
+        for i = 1, self.abilities.chain.bounce, 1 do
+            local nearestEnemy = FindNearestEnemyviaEnemy(currentEnemy, self.abilities.chain.radius)
             if nearestEnemy then
-                print( "Enemy " .. currentEnemy.id .. " Chaining to Enemy " .. nearestEnemy.id)
                 love.graphics.setColor(1, 1, 1)
                 love.graphics.line(currentEnemy.x, currentEnemy.y, nearestEnemy.x, nearestEnemy.y)
-                nearestEnemy:RemoveHp(Player.damage)
+                local damage = Player.attack.damage * Player.attack.mult
+                nearestEnemy:RemoveHp(damage)
+                Player.abilities.chain.dpsInterval = Player.abilities.chain.dpsInterval + damage
                 table.insert(GameState.Chains, {
                     startTime = love.timer.getTime(),
                     startEnemy = currentEnemy,
@@ -80,7 +91,6 @@ function Player:Abilities(e)
             currentEnemy = nearestEnemy
         end
     end
-    print( "----------  ----------")
 end
 
 Collector = {}
@@ -89,8 +99,8 @@ Collector.__index = Collector
 function Collector:SpawnCollector()
     local collector = setmetatable({}, { __index = self })
 
-    collector.id = #Player.collectors + 1
-    collector.speed = 1*60
+    collector.id = #Player.collector.collectors + 1
+    collector.speed = Player.collector.speed * 60
     collector.active = false
     collector.reTurn = false
     collector.x = Player.x
@@ -100,8 +110,6 @@ function Collector:SpawnCollector()
     collector.dy = 0
     collector.direction = 0
     collector.value = 0
-
-    print( "Spawning Collector " ..collector.id)
     return collector
 end
 

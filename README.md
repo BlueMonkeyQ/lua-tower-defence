@@ -27,6 +27,11 @@ Post Run
 * Add new game / load game
 * Add save game
 * Add buy menu
-* Fix Game crashing when player dies from enemy
-* Add waves that increase as time goes on
+<!-- * Fix Game crashing when player dies from enemy -->
+<!-- * Add waves that increase as time goes on -->
 * Differnt enemy types (json or yaml?)
+
+<!-- Fix chain lighting bouncing off same enemy -->
+<!-- Fix dps counter -->
+<!-- Fix info popup not on mouse -->
+<!-- add ui for kill count, currency, time? -->
